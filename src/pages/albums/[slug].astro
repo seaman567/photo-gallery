@@ -1,0 +1,73 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PhotoGrid from '../../components/PhotoGrid.astro';
+import { albums, getAlbum } from '../../data/albums';
+
+export function getStaticPaths() {
+  return albums.map((album) => ({
+    params: { slug: album.slug },
+  }));
+}
+
+const { slug } = Astro.params;
+const album = getAlbum(slug!);
+
+if (!album) {
+  throw new Error(`Album not found: ${slug}`);
+}
+---
+
+<BaseLayout title={album.title} description={album.description}>
+  <section class="album-hero">
+    <a class="back" href="/">← Albums</a>
+    <h1>{album.title}</h1>
+    <p class="desc">{album.description}</p>
+    <p class="meta">
+      <time datetime={album.date}>{album.date}</time>
+      <span aria-hidden="true"> · </span>
+      {album.photos.length} photos
+    </p>
+  </section>
+
+  <PhotoGrid photos={album.photos} albumTitle={album.title} />
+</BaseLayout>
+
+<style>
+  .album-hero {
+    padding: 2.5rem 0 1.75rem;
+    animation: rise 0.7s var(--ease) both;
+  }
+
+  .back {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+    transition: color 0.25s var(--ease);
+  }
+
+  .back:hover {
+    color: var(--ink);
+  }
+
+  h1 {
+    margin: 0 0 0.6rem;
+    font-family: var(--font-display);
+    font-size: clamp(2.4rem, 6vw, 3.6rem);
+    font-weight: 500;
+    line-height: 1.05;
+  }
+
+  .desc {
+    margin: 0 0 0.5rem;
+    max-width: 36rem;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  .meta {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+</style>

@@ -1,0 +1,22 @@
+{
+  "name": "photo-gallery",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=18.14.1"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "process-photos": "node scripts/process-photos.mjs"
+  },
+  "dependencies": {
+    "astro": "^4.16.18",
+    "photoswipe": "^5.4.4"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
+  }
+}

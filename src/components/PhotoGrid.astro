@@ -1,0 +1,84 @@
+---
+import type { Photo } from '../data/albums';
+
+interface Props {
+  photos: Photo[];
+  albumTitle: string;
+}
+
+const { photos, albumTitle } = Astro.props;
+---
+
+<div class="photo-grid" id="gallery" data-album={albumTitle}>
+  {
+    photos.map((photo, index) => (
+      <a
+        class="photo-cell"
+        href={photo.src}
+        data-pswp-width={photo.width}
+        data-pswp-height={photo.height}
+        data-cropped="true"
+        style={`animation-delay: ${0.04 * index}s`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        <img
+          src={photo.thumb ?? photo.src}
+          alt={photo.alt}
+          loading={index < 4 ? 'eager' : 'lazy'}
+          decoding="async"
+        />
+      </a>
+    ))
+  }
+</div>
+
+<script>
+  import PhotoSwipeLightbox from 'photoswipe/lightbox';
+  import 'photoswipe/style.css';
+
+  const gallery = document.querySelector('#gallery');
+  if (gallery) {
+    const lightbox = new PhotoSwipeLightbox({
+      gallery: '#gallery',
+      children: 'a',
+      pswpModule: () => import('photoswipe'),
+    });
+    lightbox.init();
+  }
+</script>
+
+<style>
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 720px) {
+    .photo-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+  }
+
+  .photo-cell {
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+    background: var(--bg-elevated);
+    animation: rise 0.7s var(--ease) both;
+  }
+
+  .photo-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.7s var(--ease), filter 0.7s var(--ease);
+  }
+
+  .photo-cell:hover img {
+    transform: scale(1.04);
+    filter: brightness(1.05);
+  }
+</style>
