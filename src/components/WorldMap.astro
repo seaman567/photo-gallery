@@ -1,0 +1,431 @@
+---
+import { mapPins } from '../data/map-pins';
+import 'leaflet/dist/leaflet.css';
+
+const pinsJson = JSON.stringify(mapPins);
+---
+
+<section class="aworld site-shell" id="aworld" aria-labelledby="aworld-heading">
+  <div class="aworld-head">
+    <h2 id="aworld-heading" class="aworld-title">A World</h2>
+    <div class="map-zoom" role="group" aria-label="地图缩放">
+      <button type="button" class="zoom-btn" data-zoom-out aria-label="缩小">−</button>
+      <button type="button" class="zoom-btn" data-zoom-in aria-label="放大">+</button>
+      <button type="button" class="zoom-btn zoom-btn--text" data-zoom-reset aria-label="重置视图">重置</button>
+    </div>
+  </div>
+
+  <!--
+    Leaflet + local equirectangular SVG (no external tile API).
+    CRS.EPSG4326 so lat/lon pins map 1:1; SVG stays sharp while panning/zooming.
+  -->
+  <div class="map-card">
+    <div class="map-canvas" data-map></div>
+    <script type="application/json" data-map-pins set:html={pinsJson} />
+    <div class="map-preview" data-preview hidden>
+      <img data-preview-img alt="" width="240" height="170" />
+      <div class="map-preview-meta">
+        <div>
+          <p data-preview-title></p>
+          <small data-preview-count></small>
+        </div>
+        <a data-preview-link href="#">查看照片</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import L from 'leaflet';
+
+  type Pin = {
+    id: string;
+    title: string;
+    lat: number;
+    lon: number;
+    thumb: string;
+    href: string;
+    count?: number;
+  };
+
+  const WORLD_BOUNDS = L.latLngBounds(L.latLng(-90, -180), L.latLng(90, 180));
+
+  async function loadWorldSvg() {
+    const res = await fetch('/maps/world.svg');
+    const text = await res.text();
+    const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+    const svg = doc.documentElement;
+    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    // Helps Leaflet size the overlay correctly
+    svg.setAttribute('width', '1000');
+    svg.setAttribute('height', '500');
+    return svg as unknown as SVGElement;
+  }
+
+  async function initMap(section: HTMLElement) {
+    const container = section.querySelector<HTMLElement>('[data-map]');
+    const preview = section.querySelector<HTMLElement>('[data-preview]');
+    const previewImg = section.querySelector<HTMLImageElement>('[data-preview-img]');
+    const previewTitle = section.querySelector<HTMLElement>('[data-preview-title]');
+    const previewCount = section.querySelector<HTMLElement>('[data-preview-count]');
+    const previewLink = section.querySelector<HTMLAnchorElement>('[data-preview-link]');
+    const zoomIn = section.querySelector<HTMLButtonElement>('[data-zoom-in]');
+    const zoomOut = section.querySelector<HTMLButtonElement>('[data-zoom-out]');
+    const zoomReset = section.querySelector<HTMLButtonElement>('[data-zoom-reset]');
+    const pinsNode = section.querySelector<HTMLScriptElement>('[data-map-pins]');
+    if (!container || !preview || !previewImg || !previewTitle || !previewLink) return;
+
+    let pins: Pin[] = [];
+    try {
+      pins = JSON.parse(pinsNode?.textContent || '[]');
+    } catch {
+      pins = [];
+    }
+
+    const map = L.map(container, {
+      crs: L.CRS.EPSG4326,
+      zoomControl: false,
+      attributionControl: false,
+      minZoom: 1,
+      maxZoom: 8,
+      maxBounds: WORLD_BOUNDS.pad(0.05),
+      maxBoundsViscosity: 0.85,
+      worldCopyJump: false,
+    });
+
+    try {
+      const svg = await loadWorldSvg();
+      L.svgOverlay(svg, WORLD_BOUNDS, { interactive: false, className: 'world-svg-layer' }).addTo(map);
+    } catch {
+      // Fallback flat ocean if SVG missing
+      L.rectangle(WORLD_BOUNDS, {
+        color: 'transparent',
+        fillColor: '#0a0b0e',
+        fillOpacity: 1,
+        interactive: false,
+      }).addTo(map);
+    }
+
+    let hideTimer = 0;
+    let activeEl: HTMLElement | null = null;
+
+    const placePreviewNear = (el: HTMLElement) => {
+      const card = section.querySelector('.map-card') as HTMLElement;
+      const cRect = card.getBoundingClientRect();
+      const mRect = el.getBoundingClientRect();
+      const pw = preview.offsetWidth || 240;
+      const ph = preview.offsetHeight || 220;
+      let left = mRect.left - cRect.left + mRect.width / 2 - pw / 2;
+      let top = mRect.top - cRect.top - ph - 12;
+      left = Math.max(12, Math.min(left, cRect.width - pw - 12));
+      if (top < 12) top = mRect.bottom - cRect.top + 12;
+      preview.style.left = `${left}px`;
+      preview.style.top = `${top}px`;
+    };
+
+    const showPreview = (pin: Pin, el: HTMLElement) => {
+      window.clearTimeout(hideTimer);
+      activeEl = el;
+      preview.hidden = false;
+      previewImg.src = pin.thumb;
+      previewImg.alt = pin.title;
+      previewTitle.textContent = pin.title;
+      if (previewCount) {
+        previewCount.textContent = pin.count ? `${pin.count} 张` : '';
+      }
+      previewLink.href = pin.href;
+      placePreviewNear(el);
+      requestAnimationFrame(() => preview.classList.add('is-in'));
+    };
+
+    const hidePreview = (immediate = false) => {
+      const run = () => {
+        preview.classList.remove('is-in');
+        preview.hidden = true;
+        activeEl = null;
+      };
+      window.clearTimeout(hideTimer);
+      if (immediate) run();
+      else hideTimer = window.setTimeout(run, 180);
+    };
+
+    const group = L.featureGroup();
+    for (const pin of pins) {
+      const icon = L.divIcon({
+        className: 'll-pin-wrap',
+        html: `<button type="button" class="ll-pin" aria-label="${pin.title}"><span class="ll-pin-ring"></span><span class="ll-pin-dot"></span><span class="ll-pin-label">${pin.title}</span></button>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+      });
+      const marker = L.marker([pin.lat, pin.lon], { icon, riseOnHover: true });
+      marker.addTo(group);
+
+      marker.on('add', () => {
+        const el = marker.getElement()?.querySelector<HTMLElement>('.ll-pin');
+        if (!el) return;
+        el.addEventListener('pointerenter', () => showPreview(pin, el));
+        el.addEventListener('pointerleave', () => hidePreview());
+        el.addEventListener('focus', () => showPreview(pin, el));
+        el.addEventListener('blur', () => hidePreview());
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          showPreview(pin, el);
+          map.flyTo([pin.lat, pin.lon], Math.max(map.getZoom(), 5), { duration: 0.7 });
+        });
+      });
+    }
+    group.addTo(map);
+
+    const fitPins = (animate: boolean) => {
+      if (pins.length) {
+        map.fitBounds(group.getBounds().pad(0.55), {
+          animate,
+          maxZoom: 4.5,
+        });
+      } else {
+        map.setView([20, 105], 2, { animate });
+      }
+    };
+
+    fitPins(false);
+    requestAnimationFrame(() => {
+      map.invalidateSize();
+      fitPins(false);
+    });
+
+    map.on('move zoom', () => {
+      if (activeEl) placePreviewNear(activeEl);
+    });
+
+    preview.addEventListener('pointerenter', () => window.clearTimeout(hideTimer));
+    preview.addEventListener('pointerleave', () => hidePreview());
+
+    zoomIn?.addEventListener('click', () => map.zoomIn({ animate: true }));
+    zoomOut?.addEventListener('click', () => map.zoomOut({ animate: true }));
+    zoomReset?.addEventListener('click', () => {
+      hidePreview(true);
+      fitPins(true);
+    });
+
+    window.addEventListener('resize', () => map.invalidateSize());
+  }
+
+  document.querySelectorAll<HTMLElement>('.aworld').forEach((section) => {
+    void initMap(section);
+  });
+</script>
+
+<style>
+  .aworld {
+    padding: 4.5rem 0 2rem;
+  }
+
+  .aworld-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .aworld-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(2.4rem, 5vw, 3.4rem);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .map-zoom {
+    display: flex;
+    gap: 0.4rem;
+  }
+
+  .zoom-btn {
+    appearance: none;
+    margin: 0;
+    min-width: 2.1rem;
+    height: 2.1rem;
+    padding: 0 0.55rem;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      background 0.2s var(--ease),
+      border-color 0.2s var(--ease);
+  }
+
+  .zoom-btn--text {
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+  }
+
+  .zoom-btn:hover {
+    background: rgba(242, 239, 232, 0.06);
+    border-color: rgba(242, 239, 232, 0.28);
+  }
+
+  .map-card {
+    position: relative;
+    border: 1px solid var(--line);
+    background: #0a0b0e;
+    overflow: hidden;
+  }
+
+  .map-canvas {
+    width: 100%;
+    height: min(62vh, 560px);
+    min-height: 320px;
+    background: #0a0b0e;
+  }
+
+  .map-card :global(.leaflet-container) {
+    background: #0a0b0e;
+    font: inherit;
+  }
+
+  .map-card :global(.world-svg-layer) {
+    pointer-events: none;
+  }
+
+  .map-card :global(.ll-pin-wrap) {
+    background: transparent;
+    border: 0;
+  }
+
+  :global(.ll-pin) {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  :global(.ll-pin-ring) {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid rgba(242, 239, 232, 0.85);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 4px rgba(10, 11, 14, 0.35);
+    transition:
+      border-color 0.2s var(--ease),
+      box-shadow 0.2s var(--ease);
+  }
+
+  :global(.ll-pin-dot) {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #f2efe8;
+    transform: translate(-50%, -50%);
+  }
+
+  :global(.ll-pin-label) {
+    position: absolute;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    color: #f2efe8;
+    font-size: 12px;
+    font-family: var(--font-body);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+    pointer-events: none;
+  }
+
+  :global(.ll-pin:hover .ll-pin-ring),
+  :global(.ll-pin:focus-visible .ll-pin-ring) {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 5px rgba(122, 158, 138, 0.28);
+  }
+
+  .map-preview {
+    position: absolute;
+    z-index: 1000;
+    width: min(240px, calc(100% - 24px));
+    background: #12141a;
+    border: 1px solid var(--line);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+      opacity 0.22s var(--ease),
+      transform 0.22s var(--ease);
+    pointer-events: none;
+  }
+
+  .map-preview.is-in {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .map-preview img {
+    width: 100%;
+    aspect-ratio: 12 / 8.5;
+    object-fit: cover;
+  }
+
+  .map-preview-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.7rem 0.85rem 0.85rem;
+  }
+
+  .map-preview-meta p {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+  }
+
+  .map-preview-meta small {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+
+  .map-preview-meta a {
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    border-bottom: 1px solid rgba(242, 239, 232, 0.25);
+    padding-bottom: 0.1rem;
+    transition:
+      color 0.2s var(--ease),
+      border-color 0.2s var(--ease);
+  }
+
+  .map-preview-meta a:hover {
+    color: var(--ink);
+    border-color: rgba(242, 239, 232, 0.55);
+  }
+
+  @media (max-width: 640px) {
+    .aworld-head {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .map-canvas {
+      height: 55vh;
+    }
+  }
+</style>

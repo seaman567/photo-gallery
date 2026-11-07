@@ -10,10 +10,12 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "process-photos": "node scripts/process-photos.mjs"
+    "process-photos": "node scripts/process-photos.mjs",
+    "migrate:backup": "node scripts/migrate-from-backup.mjs"
   },
   "dependencies": {
     "astro": "^4.16.18",
+    "leaflet": "^1.9.4",
     "photoswipe": "^5.4.4"
   },
   "devDependencies": {

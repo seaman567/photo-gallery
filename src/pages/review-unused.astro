@@ -1,0 +1,332 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getUnusedPhotos } from '../data/unused-photos';
+
+const unused = getUnusedPhotos();
+const neverShown = unused.filter((p) => !p.wasRemoved);
+const removed = unused.filter((p) => p.wasRemoved);
+---
+
+<BaseLayout title="待审阅照片（临时）" description="从未展示或已移除的备份照片，供补标年份与地点">
+  <section class="review-hero">
+    <a class="back" href="/">← 遨游记</a>
+    <h1>待审阅</h1>
+    <p class="desc">
+      临时页。在每张卡片上选择操作并填写地点（可选改年份），最后点「复制结果」发给我即可。
+    </p>
+    <p class="meta">从未入库 {neverShown.length} · 曾移除仍留盘 {removed.length}</p>
+  </section>
+
+  <div class="review-toolbar">
+    <button type="button" id="copy-json" class="btn">复制结果 JSON</button>
+    <button type="button" id="copy-text" class="btn btn-ghost">复制纯文本</button>
+    <span id="copy-status" class="status" hidden></span>
+  </div>
+
+  <section class="review-block" aria-labelledby="never-heading">
+    <h2 id="never-heading">从未入库</h2>
+    <div class="review-grid" data-group="never">
+      {
+        neverShown.map((photo, i) => (
+          <article class="review-card" data-src={photo.src} data-file={photo.file} data-year-default={photo.year}>
+            <div class="num">#{i + 1}</div>
+            <a class="thumb" href={photo.src} target="_blank" rel="noreferrer">
+              <img src={photo.thumb} alt={photo.file} loading="lazy" decoding="async" />
+            </a>
+            <code class="file">{photo.file}</code>
+            <label class="field">
+              <span>操作</span>
+              <select class="action">
+                <option value="keep" selected>
+                  保留入库
+                </option>
+                <option value="delete">删除（不展示）</option>
+                <option value="skip">暂跳过</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>年份</span>
+              <input class="year" type="text" value={photo.year} placeholder="2021" />
+            </label>
+            <label class="field">
+              <span>地点</span>
+              <input class="place" type="text" placeholder="如 苏州市 / 羊茸哈德" />
+            </label>
+            <label class="field">
+              <span>备注</span>
+              <input class="note" type="text" placeholder="可选" />
+            </label>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="review-block" aria-labelledby="removed-heading">
+    <h2 id="removed-heading">曾从相册移除（文件仍在）</h2>
+    <p class="hint">默认「删除」；若要恢复再改成保留并填地点。</p>
+    <div class="review-grid" data-group="removed">
+      {
+        removed.map((photo, i) => (
+          <article class="review-card" data-src={photo.src} data-file={photo.file} data-year-default={photo.year}>
+            <div class="num">R{i + 1}</div>
+            <a class="thumb" href={photo.src} target="_blank" rel="noreferrer">
+              <img src={photo.thumb} alt={photo.file} loading="lazy" decoding="async" />
+            </a>
+            <code class="file">{photo.file}</code>
+            <label class="field">
+              <span>操作</span>
+              <select class="action">
+                <option value="delete" selected>
+                  删除（不展示）
+                </option>
+                <option value="keep">恢复入库</option>
+                <option value="skip">暂跳过</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>年份</span>
+              <input class="year" type="text" value={photo.year} placeholder="2021" />
+            </label>
+            <label class="field">
+              <span>地点</span>
+              <input class="place" type="text" placeholder="如 苏州市" />
+            </label>
+            <label class="field">
+              <span>备注</span>
+              <input class="note" type="text" placeholder="可选" />
+            </label>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  const STORAGE_KEY = 'review-unused-draft-v1';
+
+  function collect() {
+    return [...document.querySelectorAll('.review-card')].map((card) => {
+      const el = card as HTMLElement;
+      return {
+        src: el.dataset.src,
+        file: el.dataset.file,
+        action: (el.querySelector('.action') as HTMLSelectElement).value,
+        year: (el.querySelector('.year') as HTMLInputElement).value.trim(),
+        place: (el.querySelector('.place') as HTMLInputElement).value.trim(),
+        note: (el.querySelector('.note') as HTMLInputElement).value.trim(),
+      };
+    });
+  }
+
+  function toText(rows: ReturnType<typeof collect>) {
+    return rows
+      .filter((r) => r.action !== 'skip')
+      .map((r) => {
+        const bits = [r.action, r.file, r.year || '?', r.place || '（无地点）'];
+        if (r.note) bits.push(r.note);
+        return bits.join(' | ');
+      })
+      .join('\n');
+  }
+
+  function saveDraft() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collect()));
+  }
+
+  function restoreDraft() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const rows = JSON.parse(raw) as ReturnType<typeof collect>;
+      const bySrc = new Map(rows.map((r) => [r.src, r]));
+      document.querySelectorAll('.review-card').forEach((card) => {
+        const el = card as HTMLElement;
+        const row = bySrc.get(el.dataset.src || '');
+        if (!row) return;
+        (el.querySelector('.action') as HTMLSelectElement).value = row.action;
+        (el.querySelector('.year') as HTMLInputElement).value = row.year;
+        (el.querySelector('.place') as HTMLInputElement).value = row.place;
+        (el.querySelector('.note') as HTMLInputElement).value = row.note;
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function copy(text: string, okMsg: string) {
+    await navigator.clipboard.writeText(text);
+    const status = document.getElementById('copy-status');
+    if (!status) return;
+    status.hidden = false;
+    status.textContent = okMsg;
+    setTimeout(() => {
+      status.hidden = true;
+    }, 2000);
+  }
+
+  restoreDraft();
+  document.querySelector('.review-toolbar')?.parentElement?.addEventListener('change', saveDraft);
+  document.querySelector('.review-toolbar')?.parentElement?.addEventListener('input', saveDraft);
+
+  document.getElementById('copy-json')?.addEventListener('click', () => {
+    copy(JSON.stringify(collect(), null, 2), '已复制 JSON');
+  });
+  document.getElementById('copy-text')?.addEventListener('click', () => {
+    copy(toText(collect()), '已复制纯文本');
+  });
+</script>
+
+<style>
+  .review-hero {
+    padding: 2.5rem 0 1rem;
+  }
+
+  .back {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--muted, #6b6560);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+
+  .back:hover {
+    color: var(--ink, #1a1814);
+  }
+
+  h1 {
+    font-family: 'Source Serif 4', serif;
+    font-weight: 600;
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
+    margin: 0 0 0.5rem;
+  }
+
+  .desc {
+    max-width: 36rem;
+    color: var(--muted, #6b6560);
+    line-height: 1.55;
+    margin: 0 0 0.5rem;
+  }
+
+  .meta {
+    color: var(--muted, #6b6560);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  .review-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 0.75rem 0;
+    margin-bottom: 0.5rem;
+    background: color-mix(in srgb, var(--bg, #f7f4ef) 92%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .btn {
+    border: 1px solid #2a2622;
+    background: #2a2622;
+    color: #f7f4ef;
+    padding: 0.45rem 0.9rem;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: #2a2622;
+  }
+
+  .status {
+    font-size: 0.85rem;
+    color: #3d6b4f;
+  }
+
+  .review-block {
+    margin-bottom: 2.5rem;
+  }
+
+  .review-block h2 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 0 0 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid color-mix(in srgb, #2a2622 18%, transparent);
+  }
+
+  .hint {
+    margin: -0.25rem 0 0.75rem;
+    font-size: 0.85rem;
+    color: var(--muted, #6b6560);
+  }
+
+  .review-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .review-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.55rem;
+    background: color-mix(in srgb, #2a2622 4%, transparent);
+  }
+
+  .num {
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    color: var(--muted, #6b6560);
+  }
+
+  .thumb {
+    display: block;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    background: #1a1814;
+  }
+
+  .thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .file {
+    font-size: 0.65rem;
+    line-height: 1.3;
+    word-break: break-all;
+    color: #4a453f;
+  }
+
+  .field {
+    display: grid;
+    grid-template-columns: 2.2rem 1fr;
+    gap: 0.35rem;
+    align-items: center;
+    font-size: 0.75rem;
+  }
+
+  .field span {
+    color: var(--muted, #6b6560);
+  }
+
+  .field input,
+  .field select {
+    width: 100%;
+    border: 1px solid color-mix(in srgb, #2a2622 20%, transparent);
+    background: #fff;
+    padding: 0.25rem 0.35rem;
+    font: inherit;
+    font-size: 0.8rem;
+  }
+</style>

@@ -5,7 +5,8 @@
   --muted: #9a958c;
   --line: rgba(242, 239, 232, 0.12);
   --accent: #7a9e8a;
-  --font-display: 'Cormorant Garamond', 'Times New Roman', serif;
+  /* Source Serif 4: clear Arabic “1” (Cormorant Garamond’s 1 looks like “I”) */
+  --font-display: 'Source Serif 4', 'Times New Roman', serif;
   --font-body: 'Outfit', system-ui, sans-serif;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -26,13 +27,13 @@ body {
   font-family: var(--font-body);
   font-weight: 400;
   color: var(--ink);
-  background:
-    radial-gradient(1200px 700px at 12% -10%, rgba(122, 158, 138, 0.18), transparent 55%),
-    radial-gradient(900px 600px at 100% 0%, rgba(90, 110, 140, 0.16), transparent 50%),
-    var(--bg);
-  background-attachment: fixed;
+  background: var(--bg);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+body.is-magazine {
+  background: #0e1014;
 }
 
 img {
@@ -92,6 +93,54 @@ a {
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.mag-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 1rem;
+  width: min(1120px, calc(100% - 2.5rem));
+  margin-inline: auto;
+  padding: 1.35rem 0;
+  color: var(--ink);
+}
+
+.mag-header .site-nav {
+  gap: 1.75rem;
+  font-size: 0.88rem;
+  letter-spacing: 0.06em;
+  color: rgba(242, 239, 232, 0.62);
+}
+
+.mag-footer {
+  margin-top: 0;
+}
+
+.section-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.8s var(--ease),
+    transform 0.8s var(--ease);
+}
+
+.reveal.is-in {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 @keyframes rise {

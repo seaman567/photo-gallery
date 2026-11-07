@@ -1,152 +1,491 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { albums } from '../data/albums';
+import Starfield from '../components/Starfield.astro';
+import WorldMap from '../components/WorldMap.astro';
+import { collections, yearArchives, yearLabel, yearPhotoCount } from '../data/catalog';
+import { photoUrl } from '../data/photoUrl';
+
+const featured = collections[0];
+const rest = collections.slice(1);
+
+const verse = [
+  'To see a world in a grain of sand',
+  'And a heaven in a wild flower',
+  'Hold infinity in the palm of your hand',
+  'And eternity in an hour',
+];
 ---
 
-<BaseLayout description="Personal photo albums — coastal light, city grain, and more.">
-  <section class="hero">
-    <p class="hero-kicker">Personal archive</p>
-    <h1 class="hero-brand">Photo Gallery</h1>
-    <p class="hero-lead">Selected frames, shown simply. Browse an album to open the lightbox.</p>
-    <a class="hero-cta" href="#albums">View albums</a>
+<BaseLayout magazine description="这是一些照片的合集和他们背后的故事">
+  <section class="cover" aria-label="封面">
+    <div class="cover-field" aria-hidden="true">
+      <Starfield density={100} />
+    </div>
+    <div class="cover-copy site-shell">
+      <div class="cover-plate">
+        <p class="cover-issue">William Blake · Auguries of Innocence</p>
+        <blockquote class="cover-verse">
+          {
+            verse.map((line, i) => (
+              <p style={`--i: ${i}`}>{line}</p>
+            ))
+          }
+        </blockquote>
+      </div>
+    </div>
+    <a class="portal-star" href="#aworld" aria-label="进入 A World" title="A World">
+      <span class="portal-core"></span>
+      <span class="portal-halo"></span>
+    </a>
+    <a class="cover-scroll" href="#aworld" aria-label="向下进入 A World">
+      <span class="cover-arrow" aria-hidden="true"></span>
+    </a>
   </section>
 
-  <section class="albums" id="albums" aria-label="Albums">
-    {
-      albums.map((album, index) => (
-        <a
-          class="album-link"
-          href={`/albums/${album.slug}/`}
-          style={`animation-delay: ${0.08 * index}s`}
-        >
-          <img src={album.cover} alt="" loading={index === 0 ? 'eager' : 'lazy'} />
-          <div class="album-meta">
-            <h2>{album.title}</h2>
-            <p>
-              <time datetime={album.date}>{album.date}</time>
-              <span aria-hidden="true"> · </span>
-              {album.photos.length} photos
-            </p>
-          </div>
-        </a>
-      ))
-    }
-  </section>
+  <WorldMap />
+
+  <div class="site-shell home-body">
+    <section class="timeline reveal" id="timeline" aria-labelledby="timeline-heading">
+      <header class="section-head">
+        <h2 id="timeline-heading">遨游记</h2>
+      </header>
+
+      <div class="year-rail">
+        {
+          yearArchives.map((album) => (
+            <a class="year-block" href={`/albums/${album.slug}/`}>
+              <span class="year-num">{yearLabel(album)}</span>
+              <img src={photoUrl(album.cover)} alt="" loading="lazy" />
+              <span class="year-count">{yearPhotoCount(album)} 张</span>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="editorial reveal" id="collections" aria-labelledby="collections-heading">
+      <details class="folio-fold">
+        <summary class="section-head folio-summary">
+          <h2 id="collections-heading">作品集</h2>
+        </summary>
+
+        <div class="folio-panel">
+          {
+            featured && (
+              <a class="feature-story" href={`/albums/${featured.slug}/`}>
+                <img src={photoUrl(featured.cover)} alt="" loading="lazy" />
+                <div class="feature-meta">
+                  <p class="feature-label">Featured</p>
+                  <h3>{featured.title}</h3>
+                  <p>{featured.photos.length} 张</p>
+                </div>
+              </a>
+            )
+          }
+
+          <ul class="folio-list">
+            {
+              rest.map((album) => (
+                <li>
+                  <a href={`/albums/${album.slug}/`}>
+                    <span class="folio-title">{album.title}</span>
+                    <span class="folio-count">{album.photos.length}</span>
+                    <img src={photoUrl(album.cover)} alt="" loading="lazy" />
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </details>
+    </section>
+  </div>
 </BaseLayout>
 
 <style>
-  .hero {
-    min-height: min(78vh, 720px);
-    display: grid;
-    align-content: end;
-    gap: 0.85rem;
-    padding: 4rem 0 3.5rem;
-    animation: fade 1s var(--ease) both;
-  }
-
-  .hero-kicker {
-    margin: 0;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    font-size: 0.72rem;
-    color: var(--muted);
-  }
-
-  .hero-brand {
-    margin: 0;
-    font-family: var(--font-display);
-    font-weight: 500;
-    font-size: clamp(3.4rem, 11vw, 6.5rem);
-    line-height: 0.92;
-    letter-spacing: -0.02em;
-  }
-
-  .hero-lead {
-    margin: 0;
-    max-width: 28rem;
-    color: var(--muted);
-    font-weight: 300;
-    font-size: 1.05rem;
-  }
-
-  .hero-cta {
-    display: inline-flex;
-    width: fit-content;
-    margin-top: 0.5rem;
-    padding: 0.7rem 1.15rem;
-    border: 1px solid var(--line);
-    color: var(--ink);
-    font-size: 0.9rem;
-    transition:
-      border-color 0.25s var(--ease),
-      background 0.25s var(--ease);
-  }
-
-  .hero-cta:hover {
-    border-color: var(--accent);
-    background: rgba(122, 158, 138, 0.12);
-  }
-
-  .albums {
-    display: grid;
-    gap: 1.25rem;
-    padding-bottom: 2rem;
-  }
-
-  @media (min-width: 720px) {
-    .albums {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1.5rem;
-    }
-  }
-
-  .album-link {
+  .cover {
     position: relative;
-    display: block;
+    min-height: 100svh;
+    display: grid;
+    align-items: center;
     overflow: hidden;
-    aspect-ratio: 16 / 11;
-    background: var(--bg-elevated);
-    animation: rise 0.8s var(--ease) both;
+    color: var(--ink);
+    background: #0a0b0e;
   }
 
-  .album-link img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.9s var(--ease), filter 0.9s var(--ease);
-  }
-
-  .album-link::after {
-    content: '';
+  .cover-field {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, rgba(10, 12, 16, 0.85) 0%, transparent 55%);
+    background: #0a0b0e;
+  }
+
+  .cover-copy {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    min-height: 100svh;
+    padding: 6.5rem 0 4rem;
     pointer-events: none;
   }
 
-  .album-meta {
+  .cover-plate {
+    max-width: min(36rem, 100%);
+  }
+
+  .cover-issue {
+    margin: 0 0 1.35rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: rgba(242, 239, 232, 0.42);
+    animation: rise 0.9s var(--ease) both;
+  }
+
+  .cover-verse {
+    margin: 0;
+    border: 0;
+    padding: 0;
+  }
+
+  .cover-verse p {
+    margin: 0;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: clamp(1.55rem, 3.8vw, 2.35rem);
+    line-height: 1.55;
+    letter-spacing: 0.015em;
+    color: rgba(242, 239, 232, 0.94);
+    white-space: nowrap;
+    animation: rise 0.95s var(--ease) calc(0.12s + var(--i, 0) * 0.1s) both;
+  }
+
+  .cover-verse p + p {
+    margin-top: 0.35rem;
+  }
+
+  @media (max-width: 640px) {
+    .cover-verse p {
+      white-space: normal;
+      max-width: 18ch;
+      font-size: clamp(1.35rem, 6.5vw, 1.7rem);
+      line-height: 1.4;
+    }
+  }
+
+  .portal-star {
     position: absolute;
-    left: 1.1rem;
-    right: 1.1rem;
-    bottom: 1rem;
+    left: 68%;
+    top: 44%;
+    z-index: 2;
+    width: 28px;
+    height: 28px;
+    transform: translate(-50%, -50%);
+    display: grid;
+    place-items: center;
+  }
+
+  .portal-core {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #f2efe8;
+    box-shadow: 0 0 12px 2px rgba(242, 239, 232, 0.55);
+    transition:
+      transform 0.35s var(--ease),
+      box-shadow 0.35s var(--ease);
+  }
+
+  .portal-halo {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(242, 239, 232, 0.28);
+    animation: portal-pulse 2.8s var(--ease) infinite;
+  }
+
+  .portal-star:hover .portal-core,
+  .portal-star:focus-visible .portal-core {
+    transform: scale(1.35);
+    box-shadow: 0 0 18px 4px rgba(242, 239, 232, 0.7);
+  }
+
+  @keyframes portal-pulse {
+    0%,
+    100% {
+      transform: scale(0.55);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(1);
+      opacity: 0.15;
+    }
+  }
+
+  .cover-scroll {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 3.25rem;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    margin-inline: auto;
+    color: rgba(242, 239, 232, 0.82);
+    animation: rise 0.9s var(--ease) 0.55s both;
+    transition: color 0.25s var(--ease);
+  }
+
+  .cover-scroll:hover {
+    color: rgba(242, 239, 232, 1);
+  }
+
+  .cover-arrow {
+    display: block;
+    width: 22px;
+    height: 22px;
+    border-right: 3.5px solid currentColor;
+    border-bottom: 3.5px solid currentColor;
+    transform: rotate(45deg);
+    animation: arrow-nudge 1.8s var(--ease) 0.9s infinite;
+  }
+
+  @keyframes arrow-nudge {
+    0%,
+    100% {
+      transform: rotate(45deg) translate(0, 0);
+      opacity: 0.8;
+    }
+    50% {
+      transform: rotate(45deg) translate(3px, 3px);
+      opacity: 1;
+    }
+  }
+
+  .home-body {
+    padding-bottom: 2rem;
+  }
+
+  .section-head {
+    padding: 4.5rem 0 1.75rem;
+    border-top: 1px solid var(--line);
+    max-width: 34rem;
+  }
+
+  #timeline .section-head {
+    border-top: 0;
+  }
+
+  .section-kicker {
+    margin: 0 0 0.5rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .section-head h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(2.4rem, 5vw, 3.4rem);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .section-lead {
+    margin: 0.75rem 0 0;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  .folio-fold {
+    border: 0;
+  }
+
+  .folio-summary {
+    position: relative;
+    list-style: none;
+    cursor: pointer;
+    padding-right: 2rem;
+  }
+
+  .folio-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .folio-summary::after {
+    content: '';
+    position: absolute;
+    right: 0.15rem;
+    top: 50%;
+    width: 0.55rem;
+    height: 0.55rem;
+    margin-top: -0.15rem;
+    border-right: 1.5px solid var(--muted);
+    border-bottom: 1.5px solid var(--muted);
+    transform: translateY(-50%) rotate(45deg);
+    transition: transform 0.25s var(--ease);
+  }
+
+  .folio-fold[open] .folio-summary::after {
+    transform: translateY(-50%) rotate(225deg);
+  }
+
+  .folio-panel {
+    padding-bottom: 0.5rem;
+  }
+
+  .feature-story {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    aspect-ratio: 16 / 10;
+    margin-bottom: 0.5rem;
+  }
+
+  .feature-story img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 1s var(--ease);
+  }
+
+  .feature-story::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(10, 12, 16, 0.88), transparent 50%);
+  }
+
+  .feature-meta {
+    position: absolute;
+    left: 1.25rem;
+    right: 1.25rem;
+    bottom: 1.15rem;
     z-index: 1;
   }
 
-  .album-meta h2 {
-    margin: 0 0 0.25rem;
+  .feature-label {
+    margin: 0 0 0.35rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .feature-meta h3 {
+    margin: 0;
     font-family: var(--font-display);
-    font-size: clamp(1.6rem, 3vw, 2rem);
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
     font-weight: 500;
   }
 
-  .album-meta p {
-    margin: 0;
+  .feature-meta p {
+    margin: 0.35rem 0 0;
     color: var(--muted);
-    font-size: 0.88rem;
+    font-size: 0.9rem;
   }
 
-  .album-link:hover img {
+  .feature-story:hover img {
+    transform: scale(1.04);
+  }
+
+  .folio-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .folio-list li {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .folio-list a {
+    display: grid;
+    grid-template-columns: 1fr auto minmax(72px, 18vw);
+    gap: 1rem;
+    align-items: center;
+    padding: 0.85rem 0;
+  }
+
+  .folio-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 2.5vw, 1.7rem);
+  }
+
+  .folio-count {
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  .folio-list img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    opacity: 0.9;
+  }
+
+  .folio-list a:hover .folio-title {
+    color: var(--accent);
+  }
+
+  .year-rail {
+    display: grid;
+    gap: 1rem;
+  }
+
+  @media (min-width: 720px) {
+    .year-rail {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.25rem;
+    }
+  }
+
+  .year-block {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+    background: var(--bg-elevated);
+  }
+
+  .year-block img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: brightness(0.72);
+    transition:
+      transform 0.9s var(--ease),
+      filter 0.9s var(--ease);
+  }
+
+  .year-num {
+    position: absolute;
+    left: 1rem;
+    top: 0.85rem;
+    z-index: 1;
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 8vw, 4.5rem);
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+
+  .year-count {
+    position: absolute;
+    left: 1rem;
+    bottom: 1rem;
+    z-index: 1;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .year-block:hover img {
     transform: scale(1.05);
-    filter: brightness(1.06);
+    filter: brightness(0.85);
   }
 </style>

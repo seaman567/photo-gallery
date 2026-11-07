@@ -1,5 +1,6 @@
 ---
 import type { Photo } from '../data/albums';
+import { photoUrl } from '../data/photoUrl';
 
 interface Props {
   photos: Photo[];
@@ -14,7 +15,7 @@ const { photos, albumTitle } = Astro.props;
     photos.map((photo, index) => (
       <a
         class="photo-cell"
-        href={photo.src}
+        href={photoUrl(photo.src)}
         data-pswp-width={photo.width}
         data-pswp-height={photo.height}
         data-cropped="true"
@@ -23,7 +24,7 @@ const { photos, albumTitle } = Astro.props;
         rel="noreferrer"
       >
         <img
-          src={photo.thumb ?? photo.src}
+          src={photoUrl(photo.thumb ?? photo.src)}
           alt={photo.alt}
           loading={index < 4 ? 'eager' : 'lazy'}
           decoding="async"

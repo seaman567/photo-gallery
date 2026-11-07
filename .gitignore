@@ -26,3 +26,12 @@ pnpm-debug.log*
 # original photos (processed output under public/photos is OK to commit if small)
 photos-src/**
 !photos-src/.gitkeep
+
+# Migrated web photos are large — upload to Aliyun OSS for production
+public/photos/**
+!public/photos/.gitkeep
+
+# local OSS tooling
+tools/
+.ossutilconfig
+

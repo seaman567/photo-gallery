@@ -1,0 +1,297 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { inboxReviewItems } from '../data/inbox-review';
+
+const withPlace = inboxReviewItems.filter((p) => p.place).length;
+const withYear = inboxReviewItems.filter((p) => p.year).length;
+---
+
+<BaseLayout title="新照片审阅（临时）" description="从本地文件夹导入的待上传照片">
+  <section class="review-hero">
+    <a class="back" href="/">← 遨游记</a>
+    <h1>新照片审阅</h1>
+    <p class="desc">
+      已根据 EXIF / 文件名预填年份；有 GPS 的已猜地点。请核对后点「复制结果」发给我。
+    </p>
+    <p class="meta">
+      共 {inboxReviewItems.length} 张 · 已填年份 {withYear} · 已填地点 {withPlace}
+    </p>
+  </section>
+
+  <div class="review-toolbar">
+    <button type="button" id="copy-json" class="btn">复制结果 JSON</button>
+    <button type="button" id="copy-text" class="btn btn-ghost">复制纯文本</button>
+    <span id="copy-status" class="status" hidden></span>
+  </div>
+
+  <div class="review-grid">
+    {
+      inboxReviewItems.map((photo, i) => (
+        <article
+          class="review-card"
+          data-src={photo.src}
+          data-id={photo.id}
+          data-original={photo.original}
+          data-width={photo.width}
+          data-height={photo.height}
+        >
+          <div class="num">
+            #{i + 1}
+            {photo.dateSource && <span class="tag">日期·{photo.dateSource}</span>}
+            {photo.placeSource && <span class="tag">地点·{photo.placeSource}</span>}
+          </div>
+          <a class="thumb" href={photo.src} target="_blank" rel="noreferrer">
+            <img src={photo.thumb} alt={photo.original} loading="lazy" decoding="async" />
+          </a>
+          <code class="file" title={photo.original}>{photo.original}</code>
+          <label class="field">
+            <span>操作</span>
+            <select class="action">
+              <option value="keep" selected>保留入库</option>
+              <option value="delete">删除</option>
+              <option value="skip">暂跳过</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>年份</span>
+            <input class="year" type="text" value={photo.year} placeholder="2024" />
+          </label>
+          <label class="field">
+            <span>日期</span>
+            <input class="date" type="text" value={photo.date} placeholder="2024-01-02" />
+          </label>
+          <label class="field">
+            <span>地点</span>
+            <input class="place" type="text" value={photo.place} placeholder="如 苏州市" />
+          </label>
+          <label class="field">
+            <span>备注</span>
+            <input class="note" type="text" placeholder="可选" />
+          </label>
+        </article>
+      ))
+    }
+  </div>
+</BaseLayout>
+
+<script>
+  const STORAGE_KEY = 'review-inbox-draft-v1';
+
+  function collect() {
+    return [...document.querySelectorAll('.review-card')].map((card) => {
+      const el = card as HTMLElement;
+      return {
+        id: el.dataset.id,
+        original: el.dataset.original,
+        src: el.dataset.src,
+        width: Number(el.dataset.width),
+        height: Number(el.dataset.height),
+        action: (el.querySelector('.action') as HTMLSelectElement).value,
+        year: (el.querySelector('.year') as HTMLInputElement).value.trim(),
+        date: (el.querySelector('.date') as HTMLInputElement).value.trim(),
+        place: (el.querySelector('.place') as HTMLInputElement).value.trim(),
+        note: (el.querySelector('.note') as HTMLInputElement).value.trim(),
+      };
+    });
+  }
+
+  function toText(rows: ReturnType<typeof collect>) {
+    return rows
+      .filter((r) => r.action !== 'skip')
+      .map((r) => {
+        const bits = [r.action, r.original, r.year || '?', r.date || '', r.place || '（无地点）'];
+        if (r.note) bits.push(r.note);
+        return bits.join(' | ');
+      })
+      .join('\n');
+  }
+
+  function saveDraft() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collect()));
+  }
+
+  function restoreDraft() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const rows = JSON.parse(raw) as ReturnType<typeof collect>;
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      document.querySelectorAll('.review-card').forEach((card) => {
+        const el = card as HTMLElement;
+        const row = byId.get(el.dataset.id || '');
+        if (!row) return;
+        (el.querySelector('.action') as HTMLSelectElement).value = row.action;
+        (el.querySelector('.year') as HTMLInputElement).value = row.year;
+        (el.querySelector('.date') as HTMLInputElement).value = row.date;
+        (el.querySelector('.place') as HTMLInputElement).value = row.place;
+        (el.querySelector('.note') as HTMLInputElement).value = row.note;
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function copy(text: string, okMsg: string) {
+    await navigator.clipboard.writeText(text);
+    const status = document.getElementById('copy-status');
+    if (!status) return;
+    status.hidden = false;
+    status.textContent = okMsg;
+    setTimeout(() => {
+      status.hidden = true;
+    }, 2000);
+  }
+
+  restoreDraft();
+  document.body.addEventListener('change', saveDraft);
+  document.body.addEventListener('input', saveDraft);
+
+  document.getElementById('copy-json')?.addEventListener('click', () => {
+    copy(JSON.stringify(collect(), null, 2), '已复制 JSON');
+  });
+  document.getElementById('copy-text')?.addEventListener('click', () => {
+    copy(toText(collect()), '已复制纯文本');
+  });
+</script>
+
+<style>
+  .review-hero {
+    padding: 2.5rem 0 1rem;
+  }
+
+  .back {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--muted, #6b6560);
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+
+  h1 {
+    font-family: 'Source Serif 4', serif;
+    font-weight: 600;
+    font-size: clamp(1.8rem, 4vw, 2.4rem);
+    margin: 0 0 0.5rem;
+  }
+
+  .desc {
+    max-width: 40rem;
+    color: var(--muted, #6b6560);
+    line-height: 1.55;
+    margin: 0 0 0.5rem;
+  }
+
+  .meta {
+    color: var(--muted, #6b6560);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  .review-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 0.75rem 0;
+    margin-bottom: 0.75rem;
+    background: color-mix(in srgb, var(--bg, #f7f4ef) 92%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .btn {
+    border: 1px solid #2a2622;
+    background: #2a2622;
+    color: #f7f4ef;
+    padding: 0.45rem 0.9rem;
+    font: inherit;
+    font-size: 0.85rem;
+    cursor: pointer;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: #2a2622;
+  }
+
+  .status {
+    font-size: 0.85rem;
+    color: #3d6b4f;
+  }
+
+  .review-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 1rem;
+    padding-bottom: 3rem;
+  }
+
+  .review-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.55rem;
+    background: color-mix(in srgb, #2a2622 4%, transparent);
+  }
+
+  .num {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--muted, #6b6560);
+  }
+
+  .tag {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.3rem;
+    background: color-mix(in srgb, #2a2622 10%, transparent);
+  }
+
+  .thumb {
+    display: block;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    background: #1a1814;
+  }
+
+  .thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .file {
+    font-size: 0.62rem;
+    line-height: 1.3;
+    word-break: break-all;
+    color: #4a453f;
+    max-height: 2.6em;
+    overflow: hidden;
+  }
+
+  .field {
+    display: grid;
+    grid-template-columns: 2.2rem 1fr;
+    gap: 0.35rem;
+    align-items: center;
+    font-size: 0.75rem;
+  }
+
+  .field span {
+    color: var(--muted, #6b6560);
+  }
+
+  .field input,
+  .field select {
+    width: 100%;
+    border: 1px solid color-mix(in srgb, #2a2622 20%, transparent);
+    background: #fff;
+    padding: 0.25rem 0.35rem;
+    font: inherit;
+    font-size: 0.8rem;
+  }
+</style>

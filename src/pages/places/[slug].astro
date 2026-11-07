@@ -1,0 +1,168 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getPlace, groupPhotosByYear, places } from '../../data/places';
+import { photoUrl } from '../../data/photoUrl';
+
+export function getStaticPaths() {
+  return places.map((place) => ({
+    params: { slug: place.id },
+  }));
+}
+
+const { slug } = Astro.params;
+const place = getPlace(slug!);
+
+if (!place) {
+  throw new Error(`Place not found: ${slug}`);
+}
+
+const yearGroups = groupPhotosByYear(place.photos);
+---
+
+<BaseLayout title={place.title} description={`${place.title} · ${place.photos.length} 张`}>
+  <section class="place-hero">
+    <a class="back" href="/#aworld">← A World</a>
+    <h1>{place.title}</h1>
+    <p class="meta">{place.photos.length} 张</p>
+  </section>
+
+  <div class="place-years" id="gallery" data-album={place.title}>
+    {
+      yearGroups.map((group, gi) => (
+        <section class="year-block" aria-labelledby={`year-${group.year}`}>
+          <h2 class="year-rule" id={`year-${group.year}`}>
+            <span>{group.year}</span>
+          </h2>
+          <div class="photo-grid">
+            {group.photos.map((photo, index) => (
+              <a
+                class="photo-cell"
+                href={photoUrl(photo.src)}
+                data-pswp-width={photo.width}
+                data-pswp-height={photo.height}
+                data-cropped="true"
+                style={`animation-delay: ${0.04 * (gi * 8 + index)}s`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <img
+                  src={photoUrl(photo.thumb ?? photo.src)}
+                  alt={photo.alt}
+                  loading={gi === 0 && index < 4 ? 'eager' : 'lazy'}
+                  decoding="async"
+                />
+              </a>
+            ))}
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</BaseLayout>
+
+<script>
+  import PhotoSwipeLightbox from 'photoswipe/lightbox';
+  import 'photoswipe/style.css';
+
+  const gallery = document.querySelector('#gallery');
+  if (gallery) {
+    const lightbox = new PhotoSwipeLightbox({
+      gallery: '#gallery',
+      children: 'a',
+      pswpModule: () => import('photoswipe'),
+    });
+    lightbox.init();
+  }
+</script>
+
+<style>
+  .place-hero {
+    padding: 2.5rem 0 1.75rem;
+    animation: rise 0.7s var(--ease) both;
+  }
+
+  .back {
+    display: inline-block;
+    margin-bottom: 1rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+    transition: color 0.25s var(--ease);
+  }
+
+  .back:hover {
+    color: var(--ink);
+  }
+
+  h1 {
+    margin: 0 0 0.5rem;
+    font-family: var(--font-display);
+    font-size: clamp(2.4rem, 6vw, 3.6rem);
+    font-weight: 500;
+    line-height: 1.05;
+  }
+
+  .meta {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+  }
+
+  .place-years {
+    display: flex;
+    flex-direction: column;
+    gap: 2.75rem;
+    padding-bottom: 3rem;
+  }
+
+  .year-rule {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0 0 1.1rem;
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+  }
+
+  .year-rule::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 720px) {
+    .photo-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+  }
+
+  .photo-cell {
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+    background: var(--bg-elevated);
+    animation: rise 0.7s var(--ease) both;
+  }
+
+  .photo-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.7s var(--ease), filter 0.7s var(--ease);
+  }
+
+  .photo-cell:hover img {
+    transform: scale(1.04);
+    filter: brightness(1.05);
+  }
+</style>

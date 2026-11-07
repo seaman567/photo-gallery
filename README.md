@@ -20,17 +20,33 @@ npm run preview
 
 ## Add your photos
 
-1. Put originals in `photos-src/<album-slug>/`.
-2. Run:
+### Migrated from old WordPress site
+
+Old backup photos were processed into `public/photos/{2021,2022,2023,2024}/` (~73MB WebP) and listed in `src/data/albums.ts`.
+
+- **Local preview:** `npm run dev` (images load from `/photos/...`)
+- **Production (Vercel):** upload the whole `public/photos` folder to **Aliyun OSS** (keep the year subfolders), then replace every `/photos/` prefix in `albums.ts` with your OSS base, e.g. `https://your-bucket.oss-cn-hangzhou.aliyuncs.com/photos/`, then `git push`.
+
+`public/photos` is gitignored on purpose (too large for GitHub).
+
+Re-run migration from extracted originals:
 
 ```bash
-npm run process-photos
+npm run migrate:backup -- "E:\\网站备份 2025. 4.8\\_extracted\\originals"
 ```
 
-3. Copy the printed JSON into `src/data/albums.ts` (edit title / description / date).
-4. For production, upload the generated WebPs to R2 / OSS / Cloudinary and replace `src` / `thumb` with CDN URLs so Vercel bandwidth stays light.
+With OSS base baked in:
 
-Sample albums already use Unsplash URLs so you can preview without local files.
+```bash
+set PHOTO_BASE=https://your-bucket.oss-cn-hangzhou.aliyuncs.com
+npm run migrate:backup -- "E:\\网站备份 2025. 4.8\\_extracted\\originals"
+```
+
+### New photos later
+
+1. Put originals in `photos-src/<album-slug>/`.
+2. Run `npm run process-photos`, paste JSON into `albums.ts`.
+3. Prefer OSS URLs in production.
 
 ## Deploy on Vercel
 
